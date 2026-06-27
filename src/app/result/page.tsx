@@ -64,6 +64,9 @@ export default function ResultPage() {
   }
 
   const { result } = match;
+  const hasWinner = !result.isTie && result.winnerTeamId != null;
+  const icon = result.isTie ? "🤝" : hasWinner ? "🏆" : "🏁";
+  const label = result.isTie ? "It's a tie!" : hasWinner ? "Winner" : "Result";
 
   const handleNewMatch = () => {
     newMatch();
@@ -72,7 +75,7 @@ export default function ResultPage() {
 
   return (
     <div className="relative min-h-dvh">
-      {!result.isTie && <Confetti />}
+      {hasWinner && <Confetti />}
       <Screen className="relative min-h-dvh justify-between pb-[calc(var(--safe-bottom)+1.5rem)] pt-[calc(var(--safe-top)+2rem)]">
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <motion.div
@@ -81,7 +84,7 @@ export default function ResultPage() {
             transition={{ type: "spring", stiffness: 220, damping: 14 }}
             className="mb-4 text-7xl"
           >
-            {result.isTie ? "🤝" : "🏆"}
+            {icon}
           </motion.div>
 
           <motion.p
@@ -90,7 +93,7 @@ export default function ResultPage() {
             transition={{ delay: 0.2 }}
             className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40"
           >
-            {result.isTie ? "It's a tie!" : "Winner"}
+            {label}
           </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 16 }}

@@ -27,7 +27,16 @@ import {
   needsNewBowler,
 } from "@/utils/cricket";
 
-type SheetType = "wide" | "noball" | "bye" | "legbye" | "wicket" | "changeBowler" | "endInnings" | null;
+type SheetType =
+  | "wide"
+  | "noball"
+  | "bye"
+  | "legbye"
+  | "wicket"
+  | "changeBowler"
+  | "endInnings"
+  | "endMatch"
+  | null;
 
 export default function ScorePage() {
   const router = useRouter();
@@ -194,6 +203,16 @@ export default function ScorePage() {
           >
             📋
           </button>
+          <button
+            type="button"
+            aria-label="End match"
+            onClick={() => setSheet("endMatch")}
+            className="flex h-10 w-10 items-center justify-center rounded-2xl border border-danger-400/40 bg-danger-500/15 text-danger-300 active:scale-95"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.4}>
+              <rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -312,6 +331,20 @@ export default function ScorePage() {
         onConfirm={() => {
           actions.endInnings();
           haptic("warning");
+        }}
+      />
+
+      <ConfirmDialog
+        open={sheet === "endMatch"}
+        onClose={closeSheet}
+        title="End the whole match?"
+        message="The match will be finished at the current score and the result declared. This can't be undone from the result screen."
+        confirmLabel="End match"
+        danger
+        onConfirm={() => {
+          actions.endMatch();
+          haptic("warning");
+          router.replace(ROUTES.result);
         }}
       />
 

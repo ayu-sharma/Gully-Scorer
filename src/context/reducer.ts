@@ -85,6 +85,7 @@ export type Action =
   | { type: "NEW_BOWLER"; bowlerId: string }
   | { type: "RETIRE_HURT" }
   | { type: "END_INNINGS" }
+  | { type: "END_MATCH" }
   | { type: "UNDO" }
   | { type: "NEW_MATCH" };
 
@@ -666,6 +667,34 @@ export function reducer(state: AppState, action: Action): AppState {
       current.isComplete = true;
       current.endReason = "declared";
       return commit(state, concludeTransition(match));
+    }
+
+    case "END_MATCH": {
+      if (!state.match) return state;
+      if (state.match.status !== "live" && state.match.status !== "innings_break") {
+        return state;
+      }
+      const match = clone(state.match);
+      const inn = match.innings[match.currentInningsIndex];
+      if (inn && !inn.isComplete) {
+        inn.isComplete = true;
+        inn.endReason = "declared";
+      }
+      // A second innings exists once the chase has begun (or at the break);
+      // otherwise the match is being abandoned during the first innings.
+      if (match.innings.length > 1 && match.innings[1]) {
+        match.result = computeResult(match);
+      } else {
+        match.result = {
+          winnerTeamId: null,
+          isTie: false,
+          margin: 0,
+          marginType: null,
+          summary: "Match ended — no result",
+        };
+      }
+      match.status = "complete";
+      return commit(state, match);
     }
 
     case "UNDO": {

@@ -63,6 +63,7 @@ export interface MatchContextValue {
   newBowler: (bowlerId: string) => void;
 
   endInnings: () => void;
+  endMatch: () => void;
   undo: () => void;
   newMatch: () => void;
 }
@@ -165,6 +166,7 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       newBowler: (bowlerId) => run({ type: "NEW_BOWLER", bowlerId }),
 
       endInnings: () => run({ type: "END_INNINGS" }),
+      endMatch: () => run({ type: "END_MATCH" }),
       undo: () => run({ type: "UNDO" }),
       newMatch: () => run({ type: "NEW_MATCH" }),
     }),
