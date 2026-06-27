@@ -3,12 +3,15 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { BallHistory } from "@/components/scoring/BallHistory";
+import { InningsScorecard } from "@/components/scoring/InningsScorecard";
 import { PlayersPanel } from "@/components/scoring/PlayersPanel";
 import { Scoreboard } from "@/components/scoring/Scoreboard";
 import { Screen } from "@/components/ui/Screen";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Spinner } from "@/components/ui/Spinner";
 import type { MatchState } from "@/types";
-import { currentInnings, getTeamById } from "@/utils/cricket";
+import { currentInnings, getTeamById, lastBalls } from "@/utils/cricket";
 
 const POLL_MS = 90000;
 
@@ -39,6 +42,9 @@ function ViewContent() {
   const [match, setMatch] = useState<MatchState | null>(null);
   const [ready, setReady] = useState(false);
   const [stale, setStale] = useState(false);
+  const [mode, setMode] = useState<"live" | "card">("live");
+  // null = follow the current innings; a value = the viewer's manual choice.
+  const [cardTab, setCardTab] = useState<string | null>(null);
 
   useEffect(() => {
     if (!matchId) {
@@ -186,6 +192,13 @@ function ViewContent() {
 
   const battingTeam = getTeamById(match, innings.battingTeamId);
 
+  const inningsList = match.innings;
+  const cardIndex = Math.min(
+    cardTab != null ? Number(cardTab) : match.currentInningsIndex,
+    inningsList.length - 1,
+  );
+  const cardInnings = inningsList[cardIndex];
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <header className="mx-auto flex w-full max-w-md items-center justify-between px-4 pt-[calc(var(--safe-top)+0.75rem)]">
@@ -198,9 +211,49 @@ function ViewContent() {
         <LiveDot stale={stale} />
       </header>
 
+      <div className="mx-auto w-full max-w-md px-4 pt-2.5">
+        <SegmentedControl<"live" | "card">
+          segments={[
+            { value: "live", label: "Live" },
+            { value: "card", label: "Scorecard" },
+          ]}
+          value={mode}
+          onChange={setMode}
+        />
+      </div>
+
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-2.5 overflow-y-auto no-scrollbar px-4 py-2.5">
-        <Scoreboard match={match} innings={innings} />
-        <PlayersPanel match={match} innings={innings} />
+        {mode === "live" ? (
+          <>
+            <Scoreboard match={match} innings={innings} />
+            <PlayersPanel match={match} innings={innings} />
+          </>
+        ) : (
+          <>
+            {inningsList.length > 1 && (
+              <SegmentedControl
+                segments={inningsList.map((inn) => ({
+                  value: String(inn.index),
+                  label: getTeamById(match, inn.battingTeamId).name,
+                }))}
+                value={String(cardIndex)}
+                onChange={setCardTab}
+              />
+            )}
+            {cardInnings && cardInnings.balls.length > 0 ? (
+              <>
+                <div className="card px-4 py-3">
+                  <BallHistory label="Last 6" balls={lastBalls(cardInnings, 6)} />
+                </div>
+                <InningsScorecard match={match} innings={cardInnings} />
+              </>
+            ) : (
+              <div className="card p-8 text-center text-white/50">
+                No deliveries yet in this innings.
+              </div>
+            )}
+          </>
+        )}
         <p className="text-center text-[11px] text-white/25 pb-4">
           View-only · Updates every few seconds
         </p>
