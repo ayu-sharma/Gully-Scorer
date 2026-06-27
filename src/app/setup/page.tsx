@@ -9,13 +9,23 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Screen } from "@/components/ui/Screen";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { TextInput } from "@/components/ui/TextInput";
-import { DEFAULT_OVERS, OVERS_OPTIONS, PLAYERS_PER_SIDE, ROUTES } from "@/constants";
+import {
+  DEFAULT_OVERS,
+  OVERS_OPTIONS,
+  PLAYERS_OPTIONS,
+  PLAYERS_PER_SIDE,
+  ROUTES,
+} from "@/constants";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useToast } from "@/hooks/useToast";
 import { useMatch } from "@/hooks/useMatch";
 import { cleanName } from "@/utils/format";
 
-const emptyXI = () => Array.from({ length: PLAYERS_PER_SIDE }, () => "");
+const emptyXI = (count: number) => Array.from({ length: count }, () => "");
+
+/** Grow or shrink a squad list to `count`, preserving entered names. */
+const resizeSquad = (squad: string[], count: number) =>
+  Array.from({ length: count }, (_, i) => squad[i] ?? "");
 
 export default function SetupPage() {
   const router = useRouter();
@@ -25,13 +35,20 @@ export default function SetupPage() {
 
   const [teamA, setTeamA] = useState("");
   const [teamB, setTeamB] = useState("");
-  const [playersA, setPlayersA] = useState<string[]>(emptyXI);
-  const [playersB, setPlayersB] = useState<string[]>(emptyXI);
+  const [playersPerSide, setPlayersPerSide] = useState(PLAYERS_PER_SIDE);
+  const [playersA, setPlayersA] = useState<string[]>(() => emptyXI(PLAYERS_PER_SIDE));
+  const [playersB, setPlayersB] = useState<string[]>(() => emptyXI(PLAYERS_PER_SIDE));
   const [overs, setOvers] = useState(DEFAULT_OVERS);
   const [active, setActive] = useState<"A" | "B">("A");
 
   const players = active === "A" ? playersA : playersB;
   const setPlayers = active === "A" ? setPlayersA : setPlayersB;
+
+  const changePlayerCount = (count: number) => {
+    setPlayersPerSide(count);
+    setPlayersA((prev) => resizeSquad(prev, count));
+    setPlayersB((prev) => resizeSquad(prev, count));
+  };
 
   const filledA = useMemo(() => playersA.filter((p) => cleanName(p)).length, [playersA]);
   const filledB = useMemo(() => playersB.filter((p) => cleanName(p)).length, [playersB]);
@@ -57,6 +74,7 @@ export default function SetupPage() {
       teamAPlayers: finalA,
       teamBPlayers: finalB,
       overs,
+      playersPerSide,
     });
     haptic("success");
     toast.success("Teams saved", "💾");
@@ -113,6 +131,29 @@ export default function SetupPage() {
           </div>
         </div>
 
+        {/* Players per side */}
+        <div className="card p-4">
+          <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-white/55">
+            Players per side
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PLAYERS_OPTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => changePlayerCount(n)}
+                className={`tnum min-h-[44px] min-w-[52px] rounded-2xl border px-3 text-base font-bold transition-colors ${
+                  playersPerSide === n
+                    ? "border-brand-400 bg-brand-500/20 text-brand-200"
+                    : "border-white/10 bg-white/[0.05] text-white/70 active:bg-white/10"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Players */}
         <div className="card p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -120,7 +161,7 @@ export default function SetupPage() {
               Players
             </p>
             <span className="text-xs text-white/40">
-              {active === "A" ? filledA : filledB}/{PLAYERS_PER_SIDE} named
+              {active === "A" ? filledA : filledB}/{playersPerSide} named
             </span>
           </div>
 

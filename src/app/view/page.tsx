@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import type { MatchState } from "@/types";
 import { currentInnings, getTeamById } from "@/utils/cricket";
 
-const POLL_MS = 4000;
+const POLL_MS = 90000;
 
 function LiveDot({ stale }: { stale: boolean }) {
   if (stale) {

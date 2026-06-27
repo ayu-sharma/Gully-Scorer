@@ -7,8 +7,15 @@ export const APP_TAGLINE = "Score a whole match with one thumb.";
 export const APP_DESCRIPTION =
   "A fast, mobile-first cricket scorer for local tournaments and gully cricket. Buttons, bottom sheets and dropdowns — almost zero typing.";
 
-/** Number of players per side. */
+/** Default number of players per side. */
 export const PLAYERS_PER_SIDE = 11;
+
+/** Players-per-side choices offered during setup. */
+export const PLAYERS_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+
+/** Bounds for players per side. */
+export const MIN_PLAYERS_PER_SIDE = 2;
+export const MAX_PLAYERS_PER_SIDE = 15;
 
 /** Default overs per innings offered during setup. */
 export const DEFAULT_OVERS = 20;

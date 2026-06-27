@@ -47,7 +47,7 @@ class Engine {
 function scenario1() {
   console.log("Scenario 1 — first innings mechanics, undo, transition");
   const e = new Engine();
-  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 2 });
+  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 2, playersPerSide: 11 });
   const A = e.m.teamA.players.map((p) => p.id);
   const B = e.m.teamB.players.map((p) => p.id);
   e.d({ type: "SET_TOSS", callerTeamId: e.m.teamA.id, call: "heads", result: "heads", winnerTeamId: e.m.teamA.id, decision: "bat" });
@@ -130,7 +130,7 @@ function scenario1() {
 function scenario2() {
   console.log("Scenario 2 — chase reaches target, win by wickets");
   const e = new Engine();
-  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 2 });
+  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 2, playersPerSide: 11 });
   const A = e.m.teamA.players.map((p) => p.id);
   const B = e.m.teamB.players.map((p) => p.id);
   e.d({ type: "SET_TOSS", callerTeamId: e.m.teamA.id, call: "heads", result: "heads", winnerTeamId: e.m.teamA.id, decision: "bat" });
@@ -155,7 +155,7 @@ function scenario2() {
 function scenario3() {
   console.log("Scenario 3 — chase falls short, win by runs");
   const e = new Engine();
-  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 1 });
+  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 1, playersPerSide: 11 });
   const A = e.m.teamA.players.map((p) => p.id);
   const B = e.m.teamB.players.map((p) => p.id);
   e.d({ type: "SET_TOSS", callerTeamId: e.m.teamA.id, call: "heads", result: "tails", winnerTeamId: e.m.teamB.id, decision: "bowl" });
@@ -191,7 +191,7 @@ function scenario3() {
 function scenario4() {
   console.log("Scenario 4 — no-ball, leg-bye, run out");
   const e = new Engine();
-  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 5 });
+  e.d({ type: "INIT_MATCH", teamAName: "Tigers", teamBName: "Lions", teamAPlayers: names("A"), teamBPlayers: names("B"), overs: 5, playersPerSide: 11 });
   const A = e.m.teamA.players.map((p) => p.id);
   const B = e.m.teamB.players.map((p) => p.id);
   e.d({ type: "SET_TOSS", callerTeamId: e.m.teamA.id, call: "heads", result: "heads", winnerTeamId: e.m.teamA.id, decision: "bat" });

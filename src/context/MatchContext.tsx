@@ -40,6 +40,7 @@ export interface MatchContextValue {
     teamAPlayers: string[];
     teamBPlayers: string[];
     overs: number;
+    playersPerSide: number;
   }) => void;
   setToss: (input: {
     callerTeamId: string;

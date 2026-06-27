@@ -7,11 +7,7 @@
  * reverse-arithmetic. Derived numbers are never stored (see utils/cricket.ts).
  */
 
-import {
-  BALLS_PER_OVER,
-  BOWLER_CREDITED_DISMISSALS,
-  PLAYERS_PER_SIDE,
-} from "@/constants";
+import { BALLS_PER_OVER, BOWLER_CREDITED_DISMISSALS } from "@/constants";
 import type {
   BallEvent,
   BatsmanInnings,
@@ -58,6 +54,7 @@ export type Action =
       teamAPlayers: string[];
       teamBPlayers: string[];
       overs: number;
+      playersPerSide: number;
     }
   | {
       type: "SET_TOSS";
@@ -130,7 +127,12 @@ function createInnings(index: number, battingTeamId: string, bowlingTeamId: stri
   };
 }
 
-function createMatch(teamA: Team, teamB: Team, overs: number): MatchState {
+function createMatch(
+  teamA: Team,
+  teamB: Team,
+  overs: number,
+  playersPerSide: number,
+): MatchState {
   const now = Date.now();
   return {
     id: uid("match"),
@@ -139,7 +141,7 @@ function createMatch(teamA: Team, teamB: Team, overs: number): MatchState {
     teamA,
     teamB,
     oversPerInnings: overs,
-    playersPerSide: PLAYERS_PER_SIDE,
+    playersPerSide,
     toss: null,
     innings: [],
     currentInningsIndex: 0,
@@ -424,7 +426,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "INIT_MATCH": {
       const teamA = makeTeam(action.teamAName, action.teamAPlayers);
       const teamB = makeTeam(action.teamBName, action.teamBPlayers);
-      const match = createMatch(teamA, teamB, action.overs);
+      const match = createMatch(teamA, teamB, action.overs, action.playersPerSide);
       match.status = "toss";
       return { match, past: [] };
     }
