@@ -1,5 +1,5 @@
 import { kv } from "@vercel/kv";
-import type { MatchState } from "@/types";
+import type { AppMatch } from "@/types";
 
 const key = (id: string) => `gully:match:${id}`;
 
@@ -8,7 +8,7 @@ export async function PUT(request: Request) {
   if (!id) return Response.json({ error: "missing id" }, { status: 400 });
 
   try {
-    const match = (await request.json()) as MatchState;
+    const match = (await request.json()) as AppMatch;
     await kv.set(key(id), match);
     return Response.json({ ok: true });
   } catch {
@@ -20,6 +20,6 @@ export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return Response.json(null, { headers: { "Cache-Control": "no-store" } });
 
-  const match = await kv.get<MatchState>(key(id));
+  const match = await kv.get<AppMatch>(key(id));
   return Response.json(match ?? null, { headers: { "Cache-Control": "no-store" } });
 }

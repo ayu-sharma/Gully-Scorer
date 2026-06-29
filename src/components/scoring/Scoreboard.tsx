@@ -8,6 +8,7 @@ import type { Innings, MatchState } from "@/types";
 import {
   ballsRemaining,
   getTeamById,
+  maxWickets,
   runsNeeded,
   thisOverBalls,
 } from "@/utils/cricket";
@@ -83,7 +84,7 @@ export function Scoreboard({ match, innings }: { match: MatchState; innings: Inn
         {isChasing ? (
           <StatTile label="Target" value={match.target ?? "—"} accent="danger" />
         ) : (
-          <StatTile label="Wkts" value={`${innings.wickets}/${match.playersPerSide - 1}`} />
+          <StatTile label="Wkts" value={`${innings.wickets}/${maxWickets(match)}`} />
         )}
       </div>
 

@@ -202,13 +202,14 @@ export interface MatchResult {
 }
 
 export interface MatchState {
+  mode: "team";
   id: string;
   createdAt: number;
   updatedAt: number;
   teamA: Team;
   teamB: Team;
   oversPerInnings: number;
-  /** Squad size per side (11). The innings auto-ends after playersPerSide - 1 wickets. */
+  /** Squad size per side. The innings auto-ends after playersPerSide - 1 wickets. */
   playersPerSide: number;
   toss: Toss | null;
   innings: Innings[];
@@ -219,6 +220,72 @@ export interface MatchState {
   result: MatchResult | null;
   airtableMatchId?: string;
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Solo gully mode
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface SoloPlayer {
+  id: string;
+  name: string;
+}
+
+export interface SoloBallEvent {
+  id: string;
+  turnIndex: number;
+  over: number;
+  ballInOver: number;
+  label: string;
+  runsOffBat: number;
+  extraRuns: number;
+  extraType: ExtraType | null;
+  totalRuns: number;
+  isLegal: boolean;
+  isWicket: boolean;
+  dismissal: Dismissal | null;
+  batterId: string;
+  bowlerId: string;
+  timestamp: number;
+}
+
+export interface SoloTurn {
+  index: number;
+  batterId: string;
+  bowlerId: string | null;
+  runs: number;
+  wickets: number;
+  legalBalls: number;
+  balls: SoloBallEvent[];
+  fours: number;
+  sixes: number;
+  extras: Extras;
+  isComplete: boolean;
+  endReason: "balls" | "wicket" | "manual" | null;
+}
+
+export interface SoloResult {
+  winnerPlayerId: string | null;
+  isTie: boolean;
+  summary: string;
+}
+
+export interface SoloMatch {
+  mode: "solo";
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  players: SoloPlayer[];
+  /** Null means the batter continues until out or manually ended. */
+  oversPerPlayer: number | null;
+  turns: SoloTurn[];
+  currentTurnIndex: number;
+  status: MatchStatus;
+  /** The dismissed batter is suggested as the next bowler after a wicket. */
+  suggestedBowlerId: string | null;
+  result: SoloResult | null;
+}
+
+export type AppMatch = MatchState | SoloMatch;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Sync queue (offline-first Airtable writes)

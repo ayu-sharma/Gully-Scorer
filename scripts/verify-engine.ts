@@ -11,7 +11,7 @@
  */
 import { reducer, initialState, type AppState, type Action } from "@/context/reducer";
 import { computeResult, currentInnings } from "@/utils/cricket";
-import type { MatchState } from "@/types";
+import type { MatchState, SoloMatch } from "@/types";
 
 let passed = 0;
 let failed = 0;
@@ -35,7 +35,11 @@ class Engine {
     this.state = reducer(this.state, action);
   }
   get m(): MatchState {
-    if (!this.state.match) throw new Error("no match");
+    if (!this.state.match || this.state.match.mode !== "team") throw new Error("no team match");
+    return this.state.match;
+  }
+  get solo(): SoloMatch {
+    if (!this.state.match || this.state.match.mode !== "solo") throw new Error("no solo match");
     return this.state.match;
   }
   get inn() {
@@ -223,10 +227,73 @@ function scenario4() {
   void strikerBefore;
 }
 
+// ── Scenario 5: solo gully turn flow ────────────────────────────────────────
+function scenario5() {
+  console.log("Scenario 5 — solo gully fixed turns and wicket swap");
+  const e = new Engine();
+  e.d({ type: "INIT_SOLO_MATCH", players: ["Avi", "Ben", "Chirag"], oversPerPlayer: 1 });
+  check("solo mode", e.solo.mode === "solo");
+  check("2-10 solo players accepted", e.solo.players.length === 3);
+  check("starts waiting for bowler", e.solo.status === "select_players");
+
+  const [avi, ben, chirag] = e.solo.players.map((p) => p.id);
+  e.d({ type: "START_SOLO_TURN", bowlerId: ben });
+  check("solo turn live", e.solo.status === "live");
+  check("Avi bats first", e.solo.turns[0].batterId === avi);
+  check("Ben bowls first", e.solo.turns[0].bowlerId === ben);
+
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 4 });
+  e.d({ type: "SOLO_WIDE", additionalRuns: 1 });
+  check("wide adds 2 but not a legal ball", e.solo.turns[0].runs === 6 && e.solo.turns[0].legalBalls === 1);
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 1 });
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 1 });
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 1 });
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 1 });
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 1 });
+  check("fixed six legal balls completes turn", e.solo.status === "select_players" && e.solo.currentTurnIndex === 1);
+  check("Avi made 11", e.solo.turns[0].runs === 11);
+
+  e.d({ type: "START_SOLO_TURN", bowlerId: avi });
+  check("Ben now bats", e.solo.turns[1].batterId === ben);
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 6 });
+  e.d({ type: "SOLO_WICKET" });
+  check("wicket records tie-breaker", e.solo.turns[1].wickets === 1);
+  check("wicket ends turn immediately", e.solo.status === "select_players" && e.solo.currentTurnIndex === 2);
+  check("out batter suggested as next bowler", e.solo.suggestedBowlerId === ben);
+
+  e.d({ type: "START_SOLO_TURN", bowlerId: ben });
+  check("Chirag bats last", e.solo.turns[2].batterId === chirag);
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 4 });
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 4 });
+  e.d({ type: "SOLO_SCORE_RUNS", runs: 4 });
+  e.d({ type: "SOLO_END_TURN" });
+  check("solo match complete after all players bat", e.solo.status === "complete");
+  check("highest score wins", e.solo.result!.winnerPlayerId === chirag);
+}
+
+// ── Scenario 6: solo till-out mode ──────────────────────────────────────────
+function scenario6() {
+  console.log("Scenario 6 — solo gully till-out turn length");
+  const e = new Engine();
+  e.d({ type: "INIT_SOLO_MATCH", players: ["Avi", "Ben"], oversPerPlayer: null });
+  const [avi, ben] = e.solo.players.map((p) => p.id);
+  e.d({ type: "START_SOLO_TURN", bowlerId: ben });
+  for (let i = 0; i < 12; i++) e.d({ type: "SOLO_SCORE_RUNS", runs: 1 });
+  check("till-out does not auto-end after two overs", e.solo.status === "live");
+  check("till-out keeps same batter after 12 balls", e.solo.turns[0].batterId === avi);
+  e.d({ type: "SOLO_WICKET" });
+  check("till-out ends on wicket", e.solo.status === "select_players" && e.solo.currentTurnIndex === 1);
+  e.d({ type: "START_SOLO_TURN", bowlerId: avi });
+  e.d({ type: "SOLO_WICKET" });
+  check("till-out match completes after every player is out", e.solo.status === "complete");
+}
+
 console.log("── Scoring engine verification ──");
 scenario1();
 scenario2();
 scenario3();
 scenario4();
+scenario5();
+scenario6();
 console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

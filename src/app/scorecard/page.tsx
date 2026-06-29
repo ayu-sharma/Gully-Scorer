@@ -22,13 +22,14 @@ export default function ScorecardPage() {
 
   useEffect(() => {
     if (hydrated && !match) router.replace(ROUTES.setup);
+    else if (hydrated && match?.mode === "solo") router.replace(ROUTES.soloResult);
   }, [hydrated, match, router]);
 
   useEffect(() => {
-    if (match) setTab(String(match.currentInningsIndex));
+    if (match?.mode === "team") setTab(String(match.currentInningsIndex));
   }, [match]);
 
-  if (!hydrated || !match) {
+  if (!hydrated || !match || match.mode !== "team") {
     return (
       <Screen className="min-h-dvh items-center justify-center">
         <Spinner size={28} />

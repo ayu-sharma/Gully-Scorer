@@ -42,9 +42,10 @@ export default function TossPage() {
 
   useEffect(() => {
     if (hydrated && !match) router.replace(ROUTES.setup);
+    else if (hydrated && match?.mode === "solo") router.replace(ROUTES.soloScore);
   }, [hydrated, match, router]);
 
-  if (!hydrated || !match) {
+  if (!hydrated || !match || match.mode !== "team") {
     return (
       <Screen className="min-h-dvh items-center justify-center">
         <Spinner size={28} />

@@ -4,7 +4,7 @@
  */
 
 import { STORAGE_KEYS } from "@/constants";
-import type { MatchState } from "@/types";
+import type { AppMatch, MatchState } from "@/types";
 
 const isBrowser = typeof window !== "undefined";
 
@@ -37,10 +37,15 @@ function remove(key: string): void {
 }
 
 export const storage = {
-  loadMatch(): MatchState | null {
-    return readJSON<MatchState>(STORAGE_KEYS.match);
+  loadMatch(): AppMatch | null {
+    const match = readJSON<AppMatch | MatchState>(STORAGE_KEYS.match);
+    if (match && typeof match === "object" && !("mode" in match)) {
+      const legacy = match as MatchState;
+      return { ...legacy, mode: "team" };
+    }
+    return match;
   },
-  saveMatch(match: MatchState): void {
+  saveMatch(match: AppMatch): void {
     writeJSON(STORAGE_KEYS.match, match);
   },
   clearMatch(): void {

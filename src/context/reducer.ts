@@ -9,6 +9,7 @@
 
 import { BALLS_PER_OVER, BOWLER_CREDITED_DISMISSALS } from "@/constants";
 import type {
+  AppMatch,
   BallEvent,
   BatsmanInnings,
   BowlerInnings,
@@ -18,6 +19,10 @@ import type {
   Innings,
   MatchState,
   Player,
+  SoloBallEvent,
+  SoloMatch,
+  SoloPlayer,
+  SoloTurn,
   Team,
 } from "@/types";
 import {
@@ -38,15 +43,15 @@ const MAX_UNDO = 200;
 // ────────────────────────────────────────────────────────────────────────────
 
 export interface AppState {
-  match: MatchState | null;
+  match: AppMatch | null;
   /** Undo stack of prior match states (in-memory; not persisted). */
-  past: MatchState[];
+  past: AppMatch[];
 }
 
 export const initialState: AppState = { match: null, past: [] };
 
 export type Action =
-  | { type: "LOAD"; match: MatchState | null }
+  | { type: "LOAD"; match: AppMatch | null }
   | {
       type: "INIT_MATCH";
       teamAName: string;
@@ -56,6 +61,20 @@ export type Action =
       overs: number;
       playersPerSide: number;
     }
+  | {
+      type: "INIT_SOLO_MATCH";
+      players: string[];
+      oversPerPlayer: number | null;
+    }
+  | { type: "START_SOLO_TURN"; bowlerId: string }
+  | { type: "SOLO_SCORE_RUNS"; runs: number }
+  | { type: "SOLO_WIDE"; additionalRuns: number }
+  | { type: "SOLO_NOBALL"; runsOffBat: number }
+  | { type: "SOLO_BYE"; runs: number }
+  | { type: "SOLO_LEGBYE"; runs: number }
+  | { type: "SOLO_WICKET" }
+  | { type: "SOLO_NEW_BOWLER"; bowlerId: string }
+  | { type: "SOLO_END_TURN" }
   | {
       type: "SET_TOSS";
       callerTeamId: string;
@@ -136,6 +155,7 @@ function createMatch(
 ): MatchState {
   const now = Date.now();
   return {
+    mode: "team",
     id: uid("match"),
     createdAt: now,
     updatedAt: now,
@@ -149,6 +169,74 @@ function createMatch(
     status: "setup",
     target: null,
     result: null,
+  };
+}
+
+function makeSoloPlayers(players: string[]): SoloPlayer[] {
+  return players.map((name) => ({ id: uid("solo"), name }));
+}
+
+function createSoloTurn(index: number, batterId: string, suggestedBowlerId: string | null): SoloTurn {
+  return {
+    index,
+    batterId,
+    bowlerId: suggestedBowlerId,
+    runs: 0,
+    wickets: 0,
+    legalBalls: 0,
+    balls: [],
+    fours: 0,
+    sixes: 0,
+    extras: { wides: 0, noballs: 0, byes: 0, legbyes: 0, total: 0 },
+    isComplete: false,
+    endReason: null,
+  };
+}
+
+function createSoloMatch(players: SoloPlayer[], oversPerPlayer: number | null): SoloMatch {
+  const now = Date.now();
+  return {
+    mode: "solo",
+    id: uid("solo_match"),
+    createdAt: now,
+    updatedAt: now,
+    players,
+    oversPerPlayer,
+    turns: [createSoloTurn(0, players[0].id, players[1]?.id ?? null)],
+    currentTurnIndex: 0,
+    status: "select_players",
+    suggestedBowlerId: players[1]?.id ?? null,
+    result: null,
+  };
+}
+
+function soloPlayerName(match: SoloMatch, playerId: string | null | undefined): string {
+  if (!playerId) return "—";
+  return match.players.find((p) => p.id === playerId)?.name ?? "—";
+}
+
+function soloBallsPerTurn(match: SoloMatch): number | null {
+  return match.oversPerPlayer == null ? null : match.oversPerPlayer * BALLS_PER_OVER;
+}
+
+function computeSoloResult(match: SoloMatch) {
+  const completed = match.turns.filter((t) => t.isComplete);
+  const bestRuns = Math.max(...completed.map((t) => t.runs));
+  const runLeaders = completed.filter((t) => t.runs === bestRuns);
+  const fewestWickets = Math.min(...runLeaders.map((t) => t.wickets));
+  const leaders = runLeaders.filter((t) => t.wickets === fewestWickets);
+  if (leaders.length !== 1) {
+    return {
+      winnerPlayerId: null,
+      isTie: true,
+      summary: `Match tied at ${bestRuns} run${bestRuns === 1 ? "" : "s"}`,
+    };
+  }
+  const winner = leaders[0];
+  return {
+    winnerPlayerId: winner.batterId,
+    isTie: false,
+    summary: `${soloPlayerName(match, winner.batterId)} won with ${winner.runs}/${winner.wickets}`,
   };
 }
 
@@ -344,6 +432,57 @@ function applyDelivery(match: MatchState, innings: Innings, input: DeliveryInput
   }
 }
 
+function applySoloDelivery(match: SoloMatch, turn: SoloTurn, input: DeliveryInput): void {
+  const bowlerId = turn.bowlerId as string;
+  const ball: SoloBallEvent = {
+    id: uid("ball"),
+    turnIndex: turn.index,
+    over: Math.floor(turn.legalBalls / BALLS_PER_OVER),
+    ballInOver: input.isLegal ? (turn.legalBalls % BALLS_PER_OVER) + 1 : 0,
+    label: input.label,
+    runsOffBat: input.runsOffBat,
+    extraRuns: input.extraRuns,
+    extraType: input.extraType,
+    totalRuns: input.runsOffBat + input.extraRuns,
+    isLegal: input.isLegal,
+    isWicket: input.isWicket,
+    dismissal: input.dismissal,
+    batterId: turn.batterId,
+    bowlerId,
+    timestamp: Date.now(),
+  };
+
+  turn.runs += ball.totalRuns;
+  if (input.isLegal) turn.legalBalls += 1;
+  if (input.extraType === null || input.extraType === "noball") {
+    if (input.runsOffBat === 4) turn.fours += 1;
+    if (input.runsOffBat === 6) turn.sixes += 1;
+  }
+
+  if (input.extraType === "wide") turn.extras.wides += input.extraRuns;
+  else if (input.extraType === "noball") turn.extras.noballs += 1;
+  else if (input.extraType === "bye") turn.extras.byes += input.extraRuns;
+  else if (input.extraType === "legbye") turn.extras.legbyes += input.extraRuns;
+  turn.extras.total =
+    turn.extras.wides + turn.extras.noballs + turn.extras.byes + turn.extras.legbyes;
+
+  if (input.isWicket) {
+    turn.wickets += 1;
+    turn.isComplete = true;
+    turn.endReason = "wicket";
+    match.suggestedBowlerId = turn.batterId;
+  }
+
+  turn.balls.push(ball);
+
+  const ballLimit = soloBallsPerTurn(match);
+  if (!turn.isComplete && ballLimit != null && turn.legalBalls >= ballLimit) {
+    turn.isComplete = true;
+    turn.endReason = "balls";
+    match.suggestedBowlerId = null;
+  }
+}
+
 /**
  * After an innings is flagged complete, advance the match: open the second
  * innings (innings break) or compute the result.
@@ -364,17 +503,35 @@ function concludeTransition(match: MatchState): MatchState {
   return match;
 }
 
+function concludeSoloTransition(match: SoloMatch): SoloMatch {
+  const turn = match.turns[match.currentTurnIndex];
+  if (!turn || !turn.isComplete || match.status !== "live") return match;
+
+  const nextIndex = match.currentTurnIndex + 1;
+  if (nextIndex >= match.players.length) {
+    match.result = computeSoloResult(match);
+    match.status = "complete";
+    return match;
+  }
+
+  const nextBatter = match.players[nextIndex];
+  match.currentTurnIndex = nextIndex;
+  match.turns[nextIndex] = createSoloTurn(nextIndex, nextBatter.id, match.suggestedBowlerId);
+  match.status = "select_players";
+  return match;
+}
+
 // ── Snapshot helpers ──────────────────────────────────────────────────────────
 
 /** Commit a mutated clone, pushing the *previous* state onto the undo stack. */
-function commit(state: AppState, match: MatchState): AppState {
+function commit(state: AppState, match: AppMatch): AppState {
   match.updatedAt = Date.now();
   const past = state.match ? [...state.past, state.match].slice(-MAX_UNDO) : state.past;
   return { match, past };
 }
 
 /** Commit a setup/phase boundary, clearing the undo stack (no cross-phase undo). */
-function commitFresh(match: MatchState): AppState {
+function commitFresh(match: AppMatch): AppState {
   match.updatedAt = Date.now();
   return { match, past: [] };
 }
@@ -384,14 +541,14 @@ function commitFresh(match: MatchState): AppState {
  * after a wicket). Preserves the undo stack so a single UNDO still reverts the
  * whole delivery, including the selection that followed it.
  */
-function commitContinue(state: AppState, match: MatchState): AppState {
+function commitContinue(state: AppState, match: AppMatch): AppState {
   match.updatedAt = Date.now();
   return { match, past: state.past };
 }
 
 /** Guard: a delivery is only valid with both batsmen, a bowler, and a live innings. */
-function canScore(match: MatchState | null): match is MatchState {
-  if (!match) return false;
+function canScore(match: AppMatch | null): match is MatchState {
+  if (!match || match.mode !== "team") return false;
   const inn = match.innings[match.currentInningsIndex];
   return Boolean(
     inn &&
@@ -401,6 +558,12 @@ function canScore(match: MatchState | null): match is MatchState {
       inn.currentBowlerId &&
       match.status === "live",
   );
+}
+
+function canScoreSolo(match: AppMatch | null): match is SoloMatch {
+  if (!match || match.mode !== "solo" || match.status !== "live") return false;
+  const turn = match.turns[match.currentTurnIndex];
+  return Boolean(turn && !turn.isComplete && turn.bowlerId && turn.batterId !== turn.bowlerId);
 }
 
 function retireStriker(match: MatchState): void {
@@ -432,8 +595,164 @@ export function reducer(state: AppState, action: Action): AppState {
       return { match, past: [] };
     }
 
+    case "INIT_SOLO_MATCH": {
+      const players = makeSoloPlayers(action.players);
+      const match = createSoloMatch(players, action.oversPerPlayer);
+      return { match, past: [] };
+    }
+
+    case "START_SOLO_TURN": {
+      if (!state.match || state.match.mode !== "solo") return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      if (!turn || turn.batterId === action.bowlerId) return state;
+      turn.bowlerId = action.bowlerId;
+      match.status = "live";
+      return commitFresh(match);
+    }
+
+    case "SOLO_SCORE_RUNS": {
+      if (!canScoreSolo(state.match)) return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      applySoloDelivery(match, turn, {
+        runsOffBat: action.runs,
+        extraRuns: 0,
+        extraType: null,
+        isLegal: true,
+        isWicket: false,
+        dismissal: null,
+        runsRanForStrike: 0,
+        chargedToBowler: action.runs,
+        countsBatsmanBall: true,
+        label: String(action.runs),
+      });
+      return commit(state, concludeSoloTransition(match));
+    }
+
+    case "SOLO_WIDE": {
+      if (!canScoreSolo(state.match)) return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      const total = 1 + action.additionalRuns;
+      applySoloDelivery(match, turn, {
+        runsOffBat: 0,
+        extraRuns: total,
+        extraType: "wide",
+        isLegal: false,
+        isWicket: false,
+        dismissal: null,
+        runsRanForStrike: 0,
+        chargedToBowler: total,
+        countsBatsmanBall: false,
+        label: total === 1 ? "Wd" : `${total}Wd`,
+      });
+      return commit(state, concludeSoloTransition(match));
+    }
+
+    case "SOLO_NOBALL": {
+      if (!canScoreSolo(state.match)) return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      applySoloDelivery(match, turn, {
+        runsOffBat: action.runsOffBat,
+        extraRuns: 1,
+        extraType: "noball",
+        isLegal: false,
+        isWicket: false,
+        dismissal: null,
+        runsRanForStrike: 0,
+        chargedToBowler: 1 + action.runsOffBat,
+        countsBatsmanBall: true,
+        label: action.runsOffBat === 0 ? "Nb" : `Nb${action.runsOffBat}`,
+      });
+      return commit(state, concludeSoloTransition(match));
+    }
+
+    case "SOLO_BYE": {
+      if (!canScoreSolo(state.match)) return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      applySoloDelivery(match, turn, {
+        runsOffBat: 0,
+        extraRuns: action.runs,
+        extraType: "bye",
+        isLegal: true,
+        isWicket: false,
+        dismissal: null,
+        runsRanForStrike: 0,
+        chargedToBowler: 0,
+        countsBatsmanBall: true,
+        label: `${action.runs}B`,
+      });
+      return commit(state, concludeSoloTransition(match));
+    }
+
+    case "SOLO_LEGBYE": {
+      if (!canScoreSolo(state.match)) return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      applySoloDelivery(match, turn, {
+        runsOffBat: 0,
+        extraRuns: action.runs,
+        extraType: "legbye",
+        isLegal: true,
+        isWicket: false,
+        dismissal: null,
+        runsRanForStrike: 0,
+        chargedToBowler: 0,
+        countsBatsmanBall: true,
+        label: `${action.runs}Lb`,
+      });
+      return commit(state, concludeSoloTransition(match));
+    }
+
+    case "SOLO_WICKET": {
+      if (!canScoreSolo(state.match)) return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      const dismissal: Dismissal = {
+        type: "bowled",
+        batsmanId: turn.batterId,
+        bowlerId: turn.bowlerId ?? undefined,
+      };
+      applySoloDelivery(match, turn, {
+        runsOffBat: 0,
+        extraRuns: 0,
+        extraType: null,
+        isLegal: true,
+        isWicket: true,
+        dismissal,
+        runsRanForStrike: 0,
+        chargedToBowler: 0,
+        countsBatsmanBall: true,
+        label: "W",
+      });
+      return commit(state, concludeSoloTransition(match));
+    }
+
+    case "SOLO_NEW_BOWLER": {
+      if (!state.match || state.match.mode !== "solo") return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      if (!turn || turn.batterId === action.bowlerId) return state;
+      turn.bowlerId = action.bowlerId;
+      return commit(state, match);
+    }
+
+    case "SOLO_END_TURN": {
+      if (!state.match || state.match.mode !== "solo") return state;
+      const match = clone(state.match);
+      const turn = match.turns[match.currentTurnIndex];
+      if (!turn || turn.isComplete) return state;
+      turn.isComplete = true;
+      turn.endReason = "manual";
+      match.suggestedBowlerId = null;
+      return commit(state, concludeSoloTransition(match));
+    }
+
     case "SET_TOSS": {
-      if (!state.match) return state;
+      if (!state.match || state.match.mode !== "team") return state;
       const match = clone(state.match);
       match.toss = {
         callerTeamId: action.callerTeamId,
@@ -457,7 +776,7 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case "START_INNINGS": {
-      if (!state.match) return state;
+      if (!state.match || state.match.mode !== "team") return state;
       const match = clone(state.match);
       const inn = match.innings[match.currentInningsIndex];
       if (!inn) return state;
@@ -618,7 +937,7 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case "NEW_BATSMAN": {
-      if (!state.match) return state;
+      if (!state.match || state.match.mode !== "team") return state;
       const match = clone(state.match);
       const inn = match.innings[match.currentInningsIndex];
       if (!inn) return state;
@@ -644,7 +963,7 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case "NEW_BOWLER": {
-      if (!state.match) return state;
+      if (!state.match || state.match.mode !== "team") return state;
       const match = clone(state.match);
       const inn = match.innings[match.currentInningsIndex];
       if (!inn) return state;
@@ -659,7 +978,7 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case "END_INNINGS": {
-      if (!state.match) return state;
+      if (!state.match || state.match.mode !== "team") return state;
       const inn = state.match.innings[state.match.currentInningsIndex];
       if (!inn || inn.isComplete || state.match.status !== "live") return state;
       const match = clone(state.match);
@@ -670,7 +989,7 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case "END_MATCH": {
-      if (!state.match) return state;
+      if (!state.match || state.match.mode !== "team") return state;
       if (state.match.status !== "live" && state.match.status !== "innings_break") {
         return state;
       }

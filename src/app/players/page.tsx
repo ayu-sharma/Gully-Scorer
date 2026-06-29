@@ -27,6 +27,8 @@ export default function PlayersPage() {
     if (!hydrated) return;
     if (!match) {
       router.replace(ROUTES.setup);
+    } else if (match.mode === "solo") {
+      router.replace(ROUTES.soloScore);
     } else if (match.status === "live") {
       router.replace(ROUTES.score);
     } else if (match.status === "complete") {
@@ -36,7 +38,7 @@ export default function PlayersPage() {
     }
   }, [hydrated, match, router]);
 
-  if (!hydrated || !match) {
+  if (!hydrated || !match || match.mode !== "team") {
     return (
       <Screen className="min-h-dvh items-center justify-center">
         <Spinner size={28} />
@@ -62,8 +64,7 @@ export default function PlayersPage() {
   const nonStrikerOptions = batOptions.map((o) => ({ ...o, disabled: o.value === strikerId }));
   const bowlerOptions: SelectOption[] = bowlingTeam.players.map((p) => ({ value: p.id, label: p.name }));
 
-  const valid =
-    strikerId && nonStrikerId && bowlerId && strikerId !== nonStrikerId;
+  const valid = Boolean(strikerId && nonStrikerId && bowlerId && strikerId !== nonStrikerId);
 
   const handleContinue = () => {
     if (!valid) return;

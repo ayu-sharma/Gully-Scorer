@@ -2,12 +2,14 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Screen } from "@/components/ui/Screen";
 import { APP_NAME, APP_TAGLINE, ROUTES } from "@/constants";
 import { useMatch } from "@/hooks/useMatch";
-import type { MatchStatus } from "@/types";
+import type { AppMatch, MatchStatus } from "@/types";
 
 const FEATURES = [
   { emoji: "👍", title: "One-thumb scoring", text: "Big buttons, bottom sheets, zero typing." },
@@ -15,7 +17,13 @@ const FEATURES = [
   { emoji: "☁️", title: "Saved as you go", text: "Local + Airtable sync, even offline." },
 ];
 
-function routeForStatus(status: MatchStatus): string {
+function routeForStatus(match: AppMatch): string {
+  if (match.mode === "solo") {
+    if (match.status === "complete") return ROUTES.soloResult;
+    if (match.status === "live" || match.status === "select_players") return ROUTES.soloScore;
+    return ROUTES.soloSetup;
+  }
+  const status: MatchStatus = match.status;
   switch (status) {
     case "toss":
       return ROUTES.toss;
@@ -34,6 +42,7 @@ function routeForStatus(status: MatchStatus): string {
 export default function HeroPage() {
   const router = useRouter();
   const { match, hydrated } = useMatch();
+  const [startOpen, setStartOpen] = useState(false);
   const hasResumable = hydrated && match && match.status !== "complete";
   const hasCompleted = hydrated && match && match.status === "complete";
 
@@ -98,7 +107,7 @@ export default function HeroPage() {
           <Button
             size="xl"
             fullWidth
-            onClick={() => router.push(routeForStatus(match!.status))}
+            onClick={() => router.push(routeForStatus(match!))}
           >
             Resume match →
           </Button>
@@ -112,11 +121,27 @@ export default function HeroPage() {
           size={hasResumable ? "lg" : "xl"}
           variant={hasResumable ? "secondary" : "primary"}
           fullWidth
-          onClick={() => router.push(ROUTES.setup)}
+          onClick={() => setStartOpen(true)}
         >
           {hasResumable ? "Start a new match" : "Start Match"}
         </Button>
       </motion.div>
+
+      <BottomSheet
+        open={startOpen}
+        onClose={() => setStartOpen(false)}
+        title="Choose match type"
+        subtitle="Team match keeps the full cricket flow. Solo Gully is for individual batting turns."
+      >
+        <div className="space-y-2.5">
+          <Button size="xl" fullWidth onClick={() => router.push(ROUTES.setup)}>
+            Team Match
+          </Button>
+          <Button size="xl" variant="accent" fullWidth onClick={() => router.push(ROUTES.soloSetup)}>
+            Solo Gully
+          </Button>
+        </div>
+      </BottomSheet>
     </Screen>
   );
 }

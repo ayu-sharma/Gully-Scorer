@@ -52,10 +52,11 @@ export default function ResultPage() {
   useEffect(() => {
     if (!hydrated) return;
     if (!match) router.replace(ROUTES.setup);
+    else if (match.mode === "solo") router.replace(ROUTES.soloResult);
     else if (match.status !== "complete") router.replace(ROUTES.score);
   }, [hydrated, match, router]);
 
-  if (!hydrated || !match || !match.result) {
+  if (!hydrated || !match || match.mode !== "team" || !match.result) {
     return (
       <Screen className="min-h-dvh items-center justify-center">
         <Spinner size={28} />

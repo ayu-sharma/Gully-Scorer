@@ -140,15 +140,15 @@ export function availableBowlers(match: MatchState, innings: Innings): Player[] 
 
 // ── Prompts the scoring screen reacts to ─────────────────────────────────────
 
-export function needsNewBatsman(innings: Innings | null): boolean {
+export function needsNewBatsman(_match: MatchState, innings: Innings | null): boolean {
   if (!innings || innings.isComplete) return false;
   return innings.strikerId == null || innings.nonStrikerId == null;
 }
 
-export function needsNewBowler(innings: Innings | null): boolean {
+export function needsNewBowler(match: MatchState, innings: Innings | null): boolean {
   if (!innings || innings.isComplete) return false;
   // Only prompt once both batsmen are set, so the new-batsman sheet wins.
-  if (innings.strikerId == null || innings.nonStrikerId == null) return false;
+  if (needsNewBatsman(match, innings)) return false;
   return innings.currentBowlerId == null;
 }
 

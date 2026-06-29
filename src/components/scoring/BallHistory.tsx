@@ -2,9 +2,11 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import type { BallEvent } from "@/types";
+import type { BallEvent, SoloBallEvent } from "@/types";
 
-function chipStyle(ball: BallEvent): string {
+type HistoryBall = BallEvent | SoloBallEvent;
+
+function chipStyle(ball: HistoryBall): string {
   if (ball.isWicket) return "bg-danger-500 text-white border-danger-400";
   if (ball.extraType === "wide" || ball.extraType === "noball")
     return "bg-accent-500/90 text-ink-950 border-accent-400";
@@ -16,7 +18,7 @@ function chipStyle(ball: BallEvent): string {
   return "bg-white/20 text-white border-white/25";
 }
 
-export function BallChip({ ball, size = "md" }: { ball: BallEvent; size?: "sm" | "md" }) {
+export function BallChip({ ball, size = "md" }: { ball: HistoryBall; size?: "sm" | "md" }) {
   const dim = size === "sm" ? "h-8 min-w-8 text-xs" : "h-10 min-w-10 text-sm";
   return (
     <motion.span
@@ -39,7 +41,7 @@ export function BallHistory({
   label,
   emptyHint = "—",
 }: {
-  balls: BallEvent[];
+  balls: HistoryBall[];
   label: string;
   emptyHint?: string;
 }) {

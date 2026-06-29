@@ -52,6 +52,8 @@ export default function ScorePage() {
     if (!hydrated) return;
     if (!match) {
       router.replace(ROUTES.setup);
+    } else if (match.mode === "solo") {
+      router.replace(ROUTES.soloScore);
     } else if (match.status === "complete") {
       router.replace(ROUTES.result);
     } else if (match.status === "toss") {
@@ -61,7 +63,7 @@ export default function ScorePage() {
     }
   }, [hydrated, match, router]);
 
-  if (!hydrated || !match) {
+  if (!hydrated || !match || match.mode !== "team") {
     return (
       <Screen className="min-h-dvh items-center justify-center">
         <Spinner size={28} />
@@ -123,8 +125,8 @@ export default function ScorePage() {
   }
 
   const battingTeam = getTeamById(match, innings.battingTeamId);
-  const showBatsman = needsNewBatsman(innings);
-  const showBowler = needsNewBowler(innings);
+  const showBatsman = needsNewBatsman(match, innings);
+  const showBowler = needsNewBowler(match, innings);
   const scoringDisabled = showBatsman || showBowler;
 
   // ── Action handlers ──────────────────────────────────────────────────────

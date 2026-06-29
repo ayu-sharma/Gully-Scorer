@@ -25,11 +25,11 @@ import {
 
 import { initSync, sync } from "@/services/sync";
 import { storage } from "@/services/storage";
-import type { DismissalType, MatchState } from "@/types";
+import type { AppMatch, DismissalType } from "@/types";
 import { initialState, reducer, type Action } from "@/context/reducer";
 
 export interface MatchContextValue {
-  match: MatchState | null;
+  match: AppMatch | null;
   /** True once the initial LocalStorage hydration has run. */
   hydrated: boolean;
   canUndo: boolean;
@@ -42,6 +42,7 @@ export interface MatchContextValue {
     overs: number;
     playersPerSide: number;
   }) => void;
+  initSoloMatch: (input: { players: string[]; oversPerPlayer: number | null }) => void;
   setToss: (input: {
     callerTeamId: string;
     call: "heads" | "tails";
@@ -66,6 +67,16 @@ export interface MatchContextValue {
   endMatch: () => void;
   undo: () => void;
   newMatch: () => void;
+
+  startSoloTurn: (bowlerId: string) => void;
+  soloScoreRuns: (runs: number) => void;
+  soloWide: (additionalRuns: number) => void;
+  soloNoBall: (runsOffBat: number) => void;
+  soloBye: (runs: number) => void;
+  soloLegBye: (runs: number) => void;
+  soloWicket: () => void;
+  soloNewBowler: (bowlerId: string) => void;
+  soloEndTurn: () => void;
 }
 
 export const MatchContext = createContext<MatchContextValue | null>(null);
@@ -85,9 +96,11 @@ export function MatchProvider({ children }: { children: ReactNode }) {
     if (saved) {
       // Treat everything already persisted as already-synced so resuming a
       // match never re-uploads the whole ball log.
-      saved.innings.forEach((inn) => inn.balls.forEach((b) => syncedBallIds.current.add(b.id)));
-      if (saved.status !== "setup") syncedTeamsForMatch.current = saved.id;
-      if (saved.status === "complete") syncedCompleteForMatch.current = saved.id;
+      if (saved.mode === "team") {
+        saved.innings.forEach((inn) => inn.balls.forEach((b) => syncedBallIds.current.add(b.id)));
+        if (saved.status !== "setup") syncedTeamsForMatch.current = saved.id;
+        if (saved.status === "complete") syncedCompleteForMatch.current = saved.id;
+      }
       dispatch({ type: "LOAD", match: saved });
     }
     const cleanup = initSync();
@@ -118,6 +131,8 @@ export function MatchProvider({ children }: { children: ReactNode }) {
     storage.saveMatch(match);
 
     // Teams, players and the initial match row — once, right after setup.
+    if (match.mode === "solo") return;
+
     if (match.status !== "setup" && syncedTeamsForMatch.current !== match.id) {
       syncedTeamsForMatch.current = match.id;
       sync.teamsAndPlayers(match);
@@ -151,6 +166,7 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       canUndo: state.past.length > 0,
 
       initMatch: (input) => run({ type: "INIT_MATCH", ...input }),
+      initSoloMatch: (input) => run({ type: "INIT_SOLO_MATCH", ...input }),
       setToss: (input) => run({ type: "SET_TOSS", ...input }),
       startInnings: (input) => run({ type: "START_INNINGS", ...input }),
 
@@ -169,6 +185,16 @@ export function MatchProvider({ children }: { children: ReactNode }) {
       endMatch: () => run({ type: "END_MATCH" }),
       undo: () => run({ type: "UNDO" }),
       newMatch: () => run({ type: "NEW_MATCH" }),
+
+      startSoloTurn: (bowlerId) => run({ type: "START_SOLO_TURN", bowlerId }),
+      soloScoreRuns: (runs) => run({ type: "SOLO_SCORE_RUNS", runs }),
+      soloWide: (additionalRuns) => run({ type: "SOLO_WIDE", additionalRuns }),
+      soloNoBall: (runsOffBat) => run({ type: "SOLO_NOBALL", runsOffBat }),
+      soloBye: (runs) => run({ type: "SOLO_BYE", runs }),
+      soloLegBye: (runs) => run({ type: "SOLO_LEGBYE", runs }),
+      soloWicket: () => run({ type: "SOLO_WICKET" }),
+      soloNewBowler: (bowlerId) => run({ type: "SOLO_NEW_BOWLER", bowlerId }),
+      soloEndTurn: () => run({ type: "SOLO_END_TURN" }),
     }),
     [state.match, state.past.length, hydrated, run],
   );
